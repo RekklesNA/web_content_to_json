@@ -1,51 +1,54 @@
+import os
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchWindowException
 from bs4 import BeautifulSoup
 import json
 import time
 
+
 def fetch_and_parse(url):
-    # 创建一个新的Selenium浏览器实例
-    browser = webdriver.Firefox()  # 或者使用其他的浏览器，例如Chrome
-
-    # 使用Selenium获取网页内容
-    browser.get(url)
-
-    # 等待一段时间，让JavaScript有足够的时间加载内容
-    time.sleep(5)
-
-    # 获取网页的源代码
-    html = browser.page_source
-
-    # 使用BeautifulSoup解析HTML内容
-    soup = BeautifulSoup(html, 'html.parser')
-
-    # 提取网页的标题和所有段落
-    title = soup.find('title').text if soup.find('title') else 'No title'
-    paragraphs = [p.text for p in soup.find_all('p')]
-
-    # 创建一个字典来存储提取的数据
-    data = {
-        'title': title,
-        'paragraphs': paragraphs
-    }
-
-    # 将字典转换为JSON字符串
-    json_data = json.dumps(data, ensure_ascii=False, indent=4)
-
-    # 关闭浏览器
-    browser.quit()
-
+    browser = webdriver.Firefox()
+    try:
+        browser.get(url)
+        time.sleep(5)
+        html = browser.page_source
+        soup = BeautifulSoup(html, 'html.parser')
+        title = soup.find('title').text if soup.find('title') else 'No title'
+        paragraphs = [p.text for p in soup.find_all('p')]
+        data = {
+            'url': url,
+            'title': title,
+            'paragraphs': paragraphs
+        }
+        json_data = json.dumps(data, ensure_ascii=False, indent=4)
+    except NoSuchWindowException:
+        print(f"Window was closed unexpectedly for URL: {url}")
+        json_data = json.dumps({
+            'error': 'Window was closed unexpectedly',
+            'url': url,
+        }, ensure_ascii=False, indent=4)
+    finally:
+        try:
+            browser.quit()
+        except NoSuchWindowException:
+            pass
     return json_data
-
-def get_url_from_user():
-    url = input("请输入要获取的网址：")
-    return url
 
 
 def main():
-    url = get_url_from_user()
-    data = fetch_and_parse(url)
-    print(data)
+    # Open the file containing URLs
+    with open('urls.txt', 'r') as file:
+        urls = file.readlines()
+
+    # Process each URL
+    for i, url in enumerate(urls):
+        url = url.strip()  # Remove any trailing newline or spaces
+        print(f"Processing URL {i + 1}/{len(urls)}: {url}")
+        data = fetch_and_parse(url)
+
+        # Write the result to a new file in the 'results' folder
+        with open(os.path.join('results', f'result{i + 1}.txt'), 'w', encoding='utf-8') as out_file:
+            out_file.write(data)
 
 
 if __name__ == "__main__":
